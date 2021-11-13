@@ -1,8 +1,10 @@
 from copy import deepcopy
+from time import time
 
 import numpy.random
 
 from common.env_factory import get_fake_set, get_real_set
+from ga_classes.envs import EnvGA
 from model_v1.v2_0.population import Population
 from model_v1.common.individual import Individual
 
@@ -46,15 +48,15 @@ class Runner:
                           " -> Fittest = " +
                           str(best_fitness))
                     conv_value = best_fitness
-                    counter = 1
             else:
                 print("Generation: " + str(generation) +
                       " -> Fittest = " +
                       str(best_fitness))
                 conv_value = best_fitness
                 counter = 1
-            if counter >= 10000:
-                converge = True
+            if counter >= 100:
+                converge = self.is_converged()
+                counter = 1
             generation += 1
         print("Generation: " + str(generation) +
               " -> Fittest = " +
@@ -81,18 +83,19 @@ class Runner:
         self.best = new_best
 
     def mutation(self):
-        for ind in self.best:
+        new_best = self.best.copy()
+        for ind in new_best:
             mut_point = numpy.random.randint(self.population.genes_count)
             t = ind.genes
             t[mut_point] = numpy.random.randint(self.population.genes_count)
             ind.genes = t
+        self.best.extend(new_best)
 
     def add_fittest(self):
+        self.best.extend(self.population.individuals)
         for ind in self.best:
             self._env.reset()
             ind.calculate_fitness(self._env)
-
-        self.best.extend(self.population.individuals)
 
         self.best.sort(key=lambda ind: ind.fitness)
 
@@ -108,3 +111,24 @@ class Runner:
             second_genes[i] = t
         first.genes = first_genes
         second.genes = second_genes
+
+    def is_converged(self) -> bool:
+        counter = {}
+        for ind in self.population.individuals:
+            if str(ind.genes) in counter.keys():
+                counter[str(ind.genes)] = counter[str(ind.genes)] + 1
+            else:
+                counter[str(ind.genes)] = 1
+        for value in counter.values():
+            if value >= len(self.population.individuals) * 0.7:
+                return True
+        return False
+
+
+if __name__ == "__main__":
+    r = Runner(EnvGA, test_set=20, real=True)
+    start = time()
+    r.run()
+    end = time()
+    print("Time = " + str((end - start)))
+    exit()

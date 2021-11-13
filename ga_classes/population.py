@@ -53,10 +53,9 @@ class PopulationP:
         if env is not None:
             fitness_env = env
 
-        fitness_env.reset()
-
         for ind in self._inds:
-            ind.calculate_fitness(fitness_env)
             fitness_env.reset()
+            ind.calculate_fitness(fitness_env)
+
 
         self.fit = True

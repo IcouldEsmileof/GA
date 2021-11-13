@@ -1,8 +1,10 @@
 from copy import deepcopy
+from time import time
 
 import numpy.random
 
 from common.env_factory import get_fake_set, get_real_set
+from model_v2.common.env import EnvGAM2 as EnvGA
 from ga_classes.population import PopulationP as Population
 from model_v2.common.individual import Individual
 
@@ -17,11 +19,11 @@ class Runner:
         self.population.calculate_fitness()
         self.best1 = None
         self.best2 = None
+        self.generation = 1
 
     def run(self):
         converge = False
         counter = 0
-        generation = 1
         conv_value = None
         best_fitness = -1
         while not converge:
@@ -43,21 +45,21 @@ class Runner:
                 if abs(conv_value - best_fitness) < 0.01:
                     counter += 1
                 else:
-                    print("Generation: " + str(generation) +
+                    print("Generation: " + str(self.generation) +
                           " -> Fittest = " +
                           str(best_fitness))
                     conv_value = best_fitness
-                    counter = 1
             else:
-                print("Generation: " + str(generation) +
+                print("Generation: " + str(self.generation) +
                       " -> Fittest = " +
                       str(best_fitness))
                 conv_value = best_fitness
                 counter = 1
-            if counter >= 10000:
-                converge = True
-            generation += 1
-        print("Generation: " + str(generation) +
+            if counter >= 100:
+                converge = self.is_converged()
+                counter = 1
+            self.generation += 1
+        print("Generation: " + str(self.generation) +
               " -> Fittest = " +
               str(best_fitness))
         self.print_results()
@@ -79,16 +81,16 @@ class Runner:
         self.best2.genes = best2_genes
 
     def mutation(self):
-        mut_point = numpy.random.random_integers(low=0, high=len(self.population.env.executors) - 1)
+        mut_point = numpy.random.randint(low=0, high=len(self.population.env.scenarios))
 
         t = self.best1.genes
-        t[mut_point] = numpy.random.random_integers(low=0, high=len(self.population.env.executors) - 1)
+        t[mut_point] = numpy.random.randint(low=0, high=len(self.population.env.executors))
         self.best1.genes = t
 
-        mut_point = numpy.random.random_integers(low=0, high=len(self.population.env.executors) - 1)
+        mut_point = numpy.random.randint(low=0, high=len(self.population.env.scenarios))
 
         t = self.best2.genes
-        t[mut_point] = numpy.random.random_integers(low=0, high=len(self.population.env.executors) - 1)
+        t[mut_point] = numpy.random.randint(low=0, high=len(self.population.env.executors))
         self.best2.genes = t
 
     def add_fittest(self):
@@ -102,13 +104,35 @@ class Runner:
         self.population.individuals[self.population.get_worst_id()] = best
 
     def print_results(self):
-        best, _ = self.population.get_best_ids()
+        best = self.population.get_best_ids()[0]
         best_ind = self.population.individuals[best]
+        best_ind.evaluate(self._env)
         id_to_o = {x.id: x for x in best_ind.makespans}
-        print("Makespan = " + str(best_ind.fitness))
+        print("Makespan = " + str(max(best_ind.makespans, key=lambda x: x.get_max_time()).get_max_time()))
 
         for executor in self.population.env.executors:
             if executor.id in id_to_o.keys():
                 print(str(id_to_o[executor.id]))
             else:
                 print(str(executor))
+
+    def is_converged(self) -> bool:
+        counter = {}
+        for ind in self.population.individuals:
+            if str(ind.genes) in counter.keys():
+                counter[str(ind.genes)] = counter[str(ind.genes)] + 1
+            else:
+                counter[str(ind.genes)] = 1
+        for value in counter.values():
+            if value >= len(self.population.individuals) * 0.7:
+                return True
+        return False
+
+
+if __name__ == "__main__":
+    r = Runner(EnvGA, test_set=20, real=True)
+    start = time()
+    r.run()
+    end = time()
+    print("Time = " + str((end - start)))
+    exit()

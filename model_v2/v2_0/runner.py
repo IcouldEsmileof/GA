@@ -1,10 +1,12 @@
 from copy import deepcopy
+from time import time
 
 import numpy.random
-
+import numpy as np
 from common.env_factory import get_fake_set, get_real_set
+from model_v2.common.env import EnvGAM2 as EnvGA
 from model_v1.v2_0.population import Population
-from model_v1.common.individual import Individual
+from model_v2.common.individual import Individual
 
 
 class Runner:
@@ -13,14 +15,14 @@ class Runner:
         if real:
             get_set_func = get_real_set
         self._env, observation, actions = get_set_func(env_class, test_set)
-        self.population = Population(10, self._env, Individual, crossover_individuals_count=10)
+        self.population = Population(20, self._env, Individual, crossover_individuals_count=10)
         self.population.calculate_fitness()
         self.best = []
+        self.generation = 1
 
     def run(self):
         converge = False
         counter = 0
-        generation = 1
         conv_value = None
         best_fitness = -1
         while not converge:
@@ -33,7 +35,7 @@ class Runner:
 
             self.add_fittest()
 
-            self.population.calculate_fitness()
+            self.population.calculate_fitness(self._env)
             best_fitness = self.population.individuals[
                 self.population.get_best_ids()[0]
             ].fitness
@@ -42,27 +44,24 @@ class Runner:
                 if abs(conv_value - best_fitness) < 0.01:
                     counter += 1
                 else:
-                    print("Generation: " + str(generation) +
+                    print("Generation: " + str(self.generation) +
                           " -> Fittest = " +
                           str(best_fitness))
                     conv_value = best_fitness
-                    counter = 1
             else:
-                print("Generation: " + str(generation) +
+                print("Generation: " + str(self.generation) +
                       " -> Fittest = " +
                       str(best_fitness))
                 conv_value = best_fitness
                 counter = 1
-            if counter >= 10000:
-                converge = True
-            generation += 1
-        print("Generation: " + str(generation) +
+            if counter >= 100:
+                converge = self.is_converged()
+                counter = 1
+            self.generation += 1
+        print("Generation: " + str(self.generation) +
               " -> Fittest = " +
               str(best_fitness))
-        best_ids = self.population.get_best_ids()
-        self._env.reset()
-        self.population.individuals[best_ids[0]].calculate_fitness(env=self._env)
-        self._env.render()
+        self.print_results()
 
     def selection(self):
         best_ids = self.population.get_best_ids()
@@ -81,18 +80,19 @@ class Runner:
         self.best = new_best
 
     def mutation(self):
-        for ind in self.best:
-            mut_point = numpy.random.randint(self.population.genes_count)
+        new_best = self.best.copy()
+        for ind in new_best:
+            mut_point = numpy.random.randint(low=0, high=len(self.population.env.scenarios))
             t = ind.genes
-            t[mut_point] = numpy.random.randint(self.population.genes_count)
+            t[mut_point] = numpy.random.randint(low=0, high=len(self.population.env.executors))
             ind.genes = t
+        self.best.extend(new_best)
 
     def add_fittest(self):
+        self.best.extend(self.population.individuals)
         for ind in self.best:
             self._env.reset()
             ind.calculate_fitness(self._env)
-
-        self.best.extend(self.population.individuals)
 
         self.best.sort(key=lambda ind: ind.fitness)
 
@@ -108,3 +108,37 @@ class Runner:
             second_genes[i] = t
         first.genes = first_genes
         second.genes = second_genes
+
+    def print_results(self):
+        best = self.population.get_best_ids()[0]
+        best_ind = self.population.individuals[best]
+        best_ind.evaluate(self._env)
+        id_to_o = {x.id: x for x in best_ind.makespans}
+        print("Makespan = " + str(max(best_ind.makespans, key=lambda x: x.get_max_time()).get_max_time()))
+
+        for executor in self.population.env.executors:
+            if executor.id in id_to_o.keys():
+                print(str(id_to_o[executor.id]))
+            else:
+                print(str(executor))
+
+    def is_converged(self) -> bool:
+        counter = {}
+        for ind in self.population.individuals:
+            if str(ind.genes) in counter.keys():
+                counter[str(ind.genes)] = counter[str(ind.genes)] + 1
+            else:
+                counter[str(ind.genes)] = 1
+        for value in counter.values():
+            if value >= len(self.population.individuals) * 0.7:
+                return True
+        return False
+
+
+if __name__ == "__main__":
+    r = Runner(EnvGA, test_set=20, real=True)
+    start = time()
+    r.run()
+    end = time()
+    print("Time = " + str((end - start)))
+    exit()

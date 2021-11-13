@@ -7,6 +7,7 @@ from common.common_classes import EvrExecutor
 class Individual(IndividualP):
     def __init__(self, scenario_count: int, executor_count: int):
         super(Individual, self).__init__(scenario_count, executor_count)
+        self.makespans = []
 
     @property
     def s_count(self):
@@ -32,7 +33,9 @@ class Individual(IndividualP):
         return self._fitness
 
     def calculate_fitness(self, env: EnvGA) -> float:
-        self._fitness = self._calculate_fitness(env)
+        for gene in self.genes:
+            env.step(gene)
+        self._fitness = env.get_current_makespan()
         return self._fitness
 
     def generate_genes(self):
@@ -53,7 +56,7 @@ class Individual(IndividualP):
             scenarios.pop(scenario_id)
         return executor
 
-    def _calculate_fitness(self, env: EnvGA) -> float:
+    def evaluate(self, env: EnvGA) -> None:
         env.reset()
         self.makespans = []
         executors = env.executors
@@ -69,5 +72,5 @@ class Individual(IndividualP):
             scens = scenarios[disp[key]]
             result = self._reorder(scens.tolist(), ex)
             self.makespans.append(result)
-        self.best = max(self.makespans, key=lambda x: x.get_max_time())
-        return self.best.get_max_time()
+        return
+

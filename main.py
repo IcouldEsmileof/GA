@@ -1,4 +1,4 @@
-from model_v1.v2_0.runner import Runner
+from model_v2.v1_0.runner import Runner
 from ga_classes.envs import EnvGA
 
 

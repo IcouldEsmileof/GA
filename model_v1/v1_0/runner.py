@@ -1,9 +1,11 @@
 from copy import deepcopy
+from time import time
 
 import numpy.random
 
 from common.env_factory import get_fake_set, get_real_set
 from ga_classes.population import PopulationP as Population
+from ga_classes.envs import EnvGA
 from model_v1.common.individual import Individual
 
 
@@ -47,15 +49,15 @@ class Runner:
                           " -> Fittest = " +
                           str(best_fitness))
                     conv_value = best_fitness
-                    counter = 1
             else:
                 print("Generation: " + str(generation) +
                       " -> Fittest = " +
                       str(best_fitness))
                 conv_value = best_fitness
                 counter = 1
-            if counter >= 10000:
-                converge = True
+            if counter >= 100:
+                converge = self.is_converged()
+                counter = 1
             generation += 1
         print("Generation: " + str(generation) +
               " -> Fittest = " +
@@ -82,16 +84,16 @@ class Runner:
         self.best2.genes = best2_genes
 
     def mutation(self):
-        mut_point = numpy.random.random_integers(low=0, high=self.population.genes_count)
+        mut_point = numpy.random.randint(self.population.genes_count)
 
         t = self.best1.genes
-        t[mut_point] = numpy.random.random_integers(low=0, high=self.population.genes_count)
+        t[mut_point] = numpy.random.randint(self.population.genes_count)
         self.best1.genes = t
 
-        mut_point = numpy.random.random_integers(low=0, high=self.population.genes_count)
+        mut_point = numpy.random.randint(self.population.genes_count)
 
         t = self.best2.genes
-        t[mut_point] = numpy.random.random_integers(low=0, high=self.population.genes_count)
+        t[mut_point] = numpy.random.randint(self.population.genes_count)
         self.best2.genes = t
 
     def add_fittest(self):
@@ -103,3 +105,24 @@ class Runner:
         best = self.best1 if self.best1.fitness > self.best2.fitness else self.best2
 
         self.population.individuals[self.population.get_worst_id()] = best
+
+    def is_converged(self) -> bool:
+        counter = {}
+        for ind in self.population.individuals:
+            if str(ind.genes) in counter.keys():
+                counter[str(ind.genes)] = counter[str(ind.genes)] + 1
+            else:
+                counter[str(ind.genes)] = 1
+        for value in counter.values():
+            if value >= len(self.population.individuals) * 0.7:
+                return True
+        return False
+
+
+if __name__ == "__main__":
+    r = Runner(EnvGA, test_set=20, real=True)
+    start = time()
+    r.run()
+    end = time()
+    print("Time = " + str((end - start)))
+    exit()
